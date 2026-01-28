@@ -114,3 +114,165 @@ class TestMixedContent:
         assert len(blocks) == 2
         assert blocks[0]["type"] == "heading_1"
         assert blocks[1]["type"] == "paragraph"
+
+
+class TestStrikethrough:
+    def test_strikethrough(self):
+        blocks = markdown_to_blocks("~~deleted~~")
+        rich_text = blocks[0]["paragraph"]["rich_text"][0]
+        assert rich_text["plain_text"] == "deleted"
+        assert rich_text["annotations"]["strikethrough"] is True
+
+
+class TestTaskList:
+    def test_unchecked_task(self):
+        md = "- [ ] Task to do"
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "to_do"
+        assert blocks[0]["to_do"]["checked"] is False
+        assert blocks[0]["to_do"]["rich_text"][0]["plain_text"] == "Task to do"
+
+    def test_checked_task(self):
+        md = "- [x] Done task"
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "to_do"
+        assert blocks[0]["to_do"]["checked"] is True
+
+    def test_multiple_tasks(self):
+        md = "- [ ] First\n- [x] Second\n- [ ] Third"
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 3
+        assert all(b["type"] == "to_do" for b in blocks)
+        assert blocks[0]["to_do"]["checked"] is False
+        assert blocks[1]["to_do"]["checked"] is True
+        assert blocks[2]["to_do"]["checked"] is False
+
+
+class TestTable:
+    def test_simple_table(self):
+        md = """| Name | Age |
+| --- | --- |
+| Alice | 30 |
+| Bob | 25 |"""
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "table"
+        table = blocks[0]["table"]
+        assert table["table_width"] == 2
+        assert len(table["children"]) == 3  # header + 2 rows
+
+    def test_table_content(self):
+        md = """| A | B |
+| --- | --- |
+| 1 | 2 |"""
+        blocks = markdown_to_blocks(md)
+        table = blocks[0]["table"]
+        children = table["children"]
+        # First row (header)
+        assert children[0]["type"] == "table_row"
+        cells = children[0]["table_row"]["cells"]
+        assert cells[0][0]["plain_text"] == "A"
+        assert cells[1][0]["plain_text"] == "B"
+
+
+class TestNestedLists:
+    def test_nested_bullet_list(self):
+        md = """- Parent
+    - Child 1
+    - Child 2"""
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "bulleted_list_item"
+        children = blocks[0]["bulleted_list_item"].get("children", [])
+        assert len(children) == 2
+        assert all(c["type"] == "bulleted_list_item" for c in children)
+
+    def test_nested_mixed_list(self):
+        md = """1. First
+    - Nested bullet
+    - Another bullet
+2. Second"""
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 2
+        assert blocks[0]["type"] == "numbered_list_item"
+        children = blocks[0]["numbered_list_item"].get("children", [])
+        assert len(children) == 2
+
+
+class TestImage:
+    def test_inline_image(self):
+        md = "![alt text](https://example.com/image.png)"
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 1
+        # Image in paragraph context becomes a link
+        rich_text = blocks[0]["paragraph"]["rich_text"][0]
+        assert rich_text["plain_text"] == "alt text"
+        assert rich_text["href"] == "https://example.com/image.png"
+
+
+class TestMathEquation:
+    def test_inline_math(self):
+        md = "The formula is $x^2 + y^2 = z^2$ here."
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 1
+        rich_text = blocks[0]["paragraph"]["rich_text"]
+        # Should have text, equation, text
+        assert any(rt.get("type") == "equation" for rt in rich_text)
+        equation_rt = [rt for rt in rich_text if rt.get("type") == "equation"][0]
+        assert equation_rt["equation"]["expression"] == "x^2 + y^2 = z^2"
+
+    def test_block_math(self):
+        md = "$$\nE = mc^2\n$$"
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "equation"
+        assert blocks[0]["equation"]["expression"] == "E = mc^2"
+
+    def test_block_math_multiline(self):
+        md = "$$\n\\frac{a}{b}\n$$"
+        blocks = markdown_to_blocks(md)
+        assert blocks[0]["type"] == "equation"
+
+
+class TestCallout:
+    def test_note_admonition(self):
+        md = '!!! note "Important"\n    This is a note.'
+        blocks = markdown_to_blocks(md)
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "callout"
+        assert blocks[0]["callout"]["icon"]["emoji"] == "📝"
+
+    def test_warning_admonition(self):
+        md = "!!! warning\n    Be careful!"
+        blocks = markdown_to_blocks(md)
+        assert blocks[0]["type"] == "callout"
+        assert blocks[0]["callout"]["icon"]["emoji"] == "⚠️"
+
+    def test_tip_admonition(self):
+        md = "!!! tip\n    A helpful tip."
+        blocks = markdown_to_blocks(md)
+        assert blocks[0]["callout"]["icon"]["emoji"] == "💡"
+
+
+class TestFootnote:
+    def test_footnote_reference(self):
+        md = "Text with footnote[^1].\n\n[^1]: This is the footnote."
+        blocks = markdown_to_blocks(md)
+        # Should have paragraph with reference and footnote callout
+        assert len(blocks) >= 1
+        # First block is paragraph with footnote ref
+        para = blocks[0]
+        assert para["type"] == "paragraph"
+        rich_text = para["paragraph"]["rich_text"]
+        # Should contain [1] marker
+        full_text = "".join(rt.get("plain_text", "") for rt in rich_text)
+        assert "[1]" in full_text
+
+    def test_footnote_content(self):
+        md = "Text[^note].\n\n[^note]: The note content."
+        blocks = markdown_to_blocks(md)
+        # Should have footnote as callout
+        callouts = [b for b in blocks if b.get("type") == "callout"]
+        assert len(callouts) >= 1

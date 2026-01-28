@@ -1,6 +1,6 @@
 # marknotion
 
-Bidirectional Markdown to Notion blocks converter.
+Bidirectional Markdown ↔ Notion converter with CLI tools.
 
 ## Installation
 
@@ -8,16 +8,78 @@ Bidirectional Markdown to Notion blocks converter.
 pip install marknotion
 ```
 
-## Usage
+## Setup
+
+### 1. Create a Notion Integration
+
+1. Go to [Notion Integrations](https://www.notion.so/my-integrations)
+2. Click "New integration"
+3. Give it a name (e.g., "marknotion")
+4. Select capabilities: Read, Update, Insert content
+5. Copy the "Internal Integration Token"
+
+### 2. Set Environment Variable
+
+```bash
+export NOTION_TOKEN="secret_xxxxx..."
+```
+
+Or create a `.env` file in your project:
+
+```
+NOTION_TOKEN=secret_xxxxx...
+```
+
+### 3. Connect Pages to Your Integration
+
+In Notion, open the page you want to access, click "..." menu → "Connections" → Add your integration.
+
+## CLI Commands
+
+### md2notion - Upload Markdown to Notion
+
+```bash
+# Update an existing page
+md2notion README.md --page "https://notion.so/My-Page-abc123..."
+
+# Create a new child page
+md2notion guide.md --parent "abc123..." --title "User Guide"
+```
+
+### notion2md - Export Notion to Markdown
+
+```bash
+# Print to stdout
+notion2md "https://notion.so/My-Page-abc123..."
+
+# Save to file
+notion2md abc123... -o exported.md
+```
+
+### notion-search - Search Notion Pages
+
+```bash
+# Search by keyword
+notion-search "meeting notes"
+
+# Limit results
+notion-search project -n 5
+```
+
+## Python API
 
 ```python
-from marknotion import markdown_to_blocks, blocks_to_markdown
+from marknotion import markdown_to_blocks, blocks_to_markdown, NotionClient
 
-# Markdown -> Notion blocks
+# Convert Markdown to Notion blocks
 blocks = markdown_to_blocks("# Hello\n\nWorld")
 
-# Notion blocks -> Markdown
+# Convert Notion blocks to Markdown
 md = blocks_to_markdown(blocks)
+
+# Use NotionClient for API operations
+client = NotionClient()  # Uses NOTION_TOKEN env var
+client.update_page_content_from_markdown(page_id, markdown)
 ```
 
 ## Supported Features

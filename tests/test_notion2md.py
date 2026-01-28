@@ -213,6 +213,174 @@ class TestToDo:
         assert blocks_to_markdown(blocks) == "- [x] Done"
 
 
+class TestStrikethrough:
+    def test_strikethrough(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"plain_text": "deleted", "annotations": {"strikethrough": True}}]
+                },
+            }
+        ]
+        assert blocks_to_markdown(blocks) == "~~deleted~~"
+
+
+class TestImage:
+    def test_external_image(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "image",
+                "image": {
+                    "type": "external",
+                    "external": {"url": "https://example.com/img.png"},
+                    "caption": [],
+                },
+            }
+        ]
+        assert blocks_to_markdown(blocks) == "![image](https://example.com/img.png)"
+
+    def test_image_with_caption(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "image",
+                "image": {
+                    "type": "external",
+                    "external": {"url": "https://example.com/img.png"},
+                    "caption": [{"plain_text": "My caption"}],
+                },
+            }
+        ]
+        assert blocks_to_markdown(blocks) == "![My caption](https://example.com/img.png)"
+
+
+class TestTable:
+    def test_simple_table(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "table",
+                "table": {
+                    "table_width": 2,
+                    "has_column_header": True,
+                    "has_row_header": False,
+                    "children": [
+                        {
+                            "type": "table_row",
+                            "table_row": {
+                                "cells": [
+                                    [{"plain_text": "A"}],
+                                    [{"plain_text": "B"}],
+                                ]
+                            },
+                        },
+                        {
+                            "type": "table_row",
+                            "table_row": {
+                                "cells": [
+                                    [{"plain_text": "1"}],
+                                    [{"plain_text": "2"}],
+                                ]
+                            },
+                        },
+                    ],
+                },
+            }
+        ]
+        result = blocks_to_markdown(blocks)
+        assert "| A" in result
+        assert "| B" in result
+        assert "---" in result
+        assert "| 1" in result
+
+
+class TestNestedLists:
+    def test_nested_bullet_list(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "bulleted_list_item",
+                "bulleted_list_item": {
+                    "rich_text": [{"plain_text": "Parent"}],
+                    "children": [
+                        {
+                            "object": "block",
+                            "type": "bulleted_list_item",
+                            "bulleted_list_item": {"rich_text": [{"plain_text": "Child"}]},
+                        }
+                    ],
+                },
+            }
+        ]
+        result = blocks_to_markdown(blocks)
+        assert "- Parent" in result
+        assert "    - Child" in result
+
+
+class TestEquation:
+    def test_block_equation(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "equation",
+                "equation": {"expression": "E = mc^2"},
+            }
+        ]
+        result = blocks_to_markdown(blocks)
+        assert "$$" in result
+        assert "E = mc^2" in result
+
+    def test_inline_equation(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {"type": "text", "plain_text": "Formula: "},
+                        {"type": "equation", "equation": {"expression": "x^2"}, "plain_text": "x^2"},
+                    ]
+                },
+            }
+        ]
+        result = blocks_to_markdown(blocks)
+        assert "$x^2$" in result
+
+
+class TestCallout:
+    def test_callout_note(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "callout",
+                "callout": {
+                    "rich_text": [{"plain_text": "This is a note"}],
+                    "icon": {"type": "emoji", "emoji": "📝"},
+                },
+            }
+        ]
+        result = blocks_to_markdown(blocks)
+        assert "!!! note" in result
+        assert "This is a note" in result
+
+    def test_callout_warning(self):
+        blocks = [
+            {
+                "object": "block",
+                "type": "callout",
+                "callout": {
+                    "rich_text": [{"plain_text": "Warning message"}],
+                    "icon": {"type": "emoji", "emoji": "⚠️"},
+                },
+            }
+        ]
+        result = blocks_to_markdown(blocks)
+        assert "!!! warning" in result
+
+
 class TestRoundTrip:
     """Test that markdown -> blocks -> markdown preserves content."""
 
@@ -231,3 +399,11 @@ class TestRoundTrip:
         blocks = markdown_to_blocks(original)
         result = blocks_to_markdown(blocks)
         assert result == original
+
+    def test_strikethrough_roundtrip(self):
+        from marknotion import markdown_to_blocks
+
+        original = "~~deleted text~~"
+        blocks = markdown_to_blocks(original)
+        result = blocks_to_markdown(blocks)
+        assert "~~deleted text~~" in result

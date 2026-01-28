@@ -1,6 +1,6 @@
 [project]
 name = "marknotion"
-version = "0.1.0"
+version = "0.2.0"
 description = "Bidirectional Markdown ↔ Notion blocks converter"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -17,7 +17,15 @@ classifiers = [
 dependencies = [
     "markdown-it-py>=3.0.0",
     "mdit-py-plugins>=0.4.0",
+    "notion-client>=2.7.0",
+    "click>=8.1.0",
+    "python-dotenv>=1.0.0",
 ]
+
+[project.scripts]
+md2notion = "marknotion.cli:md2notion"
+notion2md = "marknotion.cli:notion2md"
+notion-search = "marknotion.cli:notion_search"
 
 [project.urls]
 Homepage = "https://github.com/li3p/marknotion"
