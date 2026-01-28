@@ -5,7 +5,7 @@ description = "Bidirectional Markdown ↔ Notion blocks converter"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
-authors = [{ name = "Libo" }]
+authors = [{ name = "Libo", email = "markdown@outlook.com" }]
 keywords = ["markdown", "notion", "converter"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -18,6 +18,11 @@ dependencies = [
     "markdown-it-py>=3.0.0",
     "mdit-py-plugins>=0.4.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/li3p/marknotion"
+Repository = "https://github.com/li3p/marknotion"
+Issues = "https://github.com/li3p/marknotion/issues"
 
 [project.optional-dependencies]
 dev = [
