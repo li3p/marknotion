@@ -307,14 +307,16 @@ def _inline_to_rich_text(tokens: list[Token]) -> list[dict]:
 def _make_rich_text(content: str, annotations: dict, href: str | None) -> dict:
     """Create a Notion rich_text object."""
     text_obj: dict = {"content": content}
-    if href:
-        text_obj["link"] = {"url": href}
+    # Skip anchor links (starting with #) - Notion doesn't support them
+    valid_href = href if href and not href.startswith("#") else None
+    if valid_href:
+        text_obj["link"] = {"url": valid_href}
 
     result: dict = {
         "type": "text",
         "text": text_obj,
         "plain_text": content,
-        "href": href,
+        "href": valid_href,
     }
 
     # Only include non-default annotations
