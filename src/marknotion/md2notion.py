@@ -354,14 +354,83 @@ def _make_list_item_block(list_type: str, rich_text: list[dict]) -> dict:
     }
 
 
+# Notion supported languages
+NOTION_LANGUAGES = {
+    "abap", "abc", "agda", "arduino", "ascii art", "assembly", "bash", "basic",
+    "bnf", "c", "c#", "c++", "clojure", "coffeescript", "coq", "css", "dart",
+    "dhall", "diff", "docker", "ebnf", "elixir", "elm", "erlang", "f#", "flow",
+    "fortran", "gherkin", "glsl", "go", "graphql", "groovy", "haskell", "hcl",
+    "html", "idris", "java", "javascript", "json", "julia", "kotlin", "latex",
+    "less", "lisp", "livescript", "llvm ir", "lua", "makefile", "markdown",
+    "markup", "matlab", "mathematica", "mermaid", "nix", "notion formula",
+    "objective-c", "ocaml", "pascal", "perl", "php", "plain text", "powershell",
+    "prolog", "protobuf", "purescript", "python", "r", "racket", "reason",
+    "ruby", "rust", "sass", "scala", "scheme", "scss", "shell", "smalltalk",
+    "solidity", "sql", "swift", "toml", "typescript", "vb.net", "verilog",
+    "vhdl", "visual basic", "webassembly", "xml", "yaml", "java/c/c++/c#",
+}
+
+# Map unsupported languages to supported ones
+LANGUAGE_ALIASES = {
+    "cypher": "sql",  # Neo4j query language -> SQL
+    "cql": "sql",
+    "sh": "shell",
+    "zsh": "shell",
+    "tsx": "typescript",
+    "jsx": "javascript",
+    "yml": "yaml",
+    "dockerfile": "docker",
+    "py": "python",
+    "js": "javascript",
+    "ts": "typescript",
+    "rb": "ruby",
+    "rs": "rust",
+    "cs": "c#",
+    "cpp": "c++",
+    "objc": "objective-c",
+    "txt": "plain text",
+    "text": "plain text",
+    "": "plain text",
+}
+
+
+def _normalize_language(language: str) -> str:
+    """Normalize language to Notion-supported format."""
+    lang = language.lower().strip()
+    # Check aliases first
+    if lang in LANGUAGE_ALIASES:
+        return LANGUAGE_ALIASES[lang]
+    # Check if already supported
+    if lang in NOTION_LANGUAGES:
+        return lang
+    # Default to plain text
+    return "plain text"
+
+
 def _make_code_block(content: str, language: str) -> dict:
-    """Create a Notion code block."""
+    """Create a Notion code block.
+
+    Notion has a 2000 character limit per rich_text item, so long content
+    is split into multiple rich_text items.
+    """
+    # Split content into chunks of max 2000 characters
+    max_len = 2000
+    rich_text_items = []
+
+    for i in range(0, len(content), max_len):
+        chunk = content[i:i + max_len]
+        rich_text_items.append(_make_rich_text(chunk, {}, None))
+
+    # Ensure at least one item (even if empty)
+    if not rich_text_items:
+        rich_text_items = [_make_rich_text("", {}, None)]
+
     return {
         "object": "block",
         "type": "code",
         "code": {
-            "rich_text": [_make_rich_text(content, {}, None)],
-            "language": language,
+            "rich_text": rich_text_items,
+            "language": _normalize_language(language),
         },
     }
 
