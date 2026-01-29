@@ -177,6 +177,23 @@ def _fetch_nested_children(client, blocks: list) -> list:
     return blocks
 
 
+def _extract_id_from_url(url: str) -> str:
+    """Extract and format ID from Notion URL.
+
+    The notion-client library has a bug where it returns incorrect IDs,
+    but the URL is correct. We extract the ID from the URL as a workaround.
+    """
+    if not url:
+        return ""
+    # URL format: https://www.notion.so/32charHexId or https://www.notion.so/Title-32charHexId
+    import re
+    match = re.search(r'([a-f0-9]{32})$', url, re.IGNORECASE)
+    if match:
+        hex_id = match.group(1).lower()
+        return f"{hex_id[:8]}-{hex_id[8:12]}-{hex_id[12:16]}-{hex_id[16:20]}-{hex_id[20:]}"
+    return ""
+
+
 def _extract_title(item: dict) -> str:
     """Extract title from a Notion page or database object."""
     obj_type = item.get("object")
@@ -241,9 +258,10 @@ def notion_search(query: str, obj_type: str, limit: int):
 
     for item in results[:limit]:
         item_type = item.get("object", "unknown")
-        item_id = item.get("id", "")
-        title = _extract_title(item)
         url = item.get("url", "")
+        # Use ID from URL due to notion-client library bug returning incorrect IDs
+        item_id = _extract_id_from_url(url) or item.get("id", "")
+        title = _extract_title(item)
 
         type_label = "[Database]" if item_type in ("database", "data_source") else "[Page]    "
         click.echo(f"{type_label} {title}")
