@@ -10,6 +10,37 @@ from mdit_py_plugins.dollarmath import dollarmath_plugin
 from mdit_py_plugins.admon import admon_plugin
 
 
+# Regex to match YAML front matter at the start of document
+FRONT_MATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+
+
+def _extract_front_matter(markdown: str) -> tuple[str | None, str]:
+    """Extract YAML front matter from markdown.
+
+    Returns:
+        Tuple of (front_matter_content, remaining_markdown).
+        front_matter_content is None if no front matter found.
+    """
+    match = FRONT_MATTER_RE.match(markdown)
+    if match:
+        front_matter = match.group(1)
+        remaining = markdown[match.end():]
+        return front_matter, remaining
+    return None, markdown
+
+
+def _make_toggle_block(title: str, children: list[dict]) -> dict:
+    """Create a Notion toggle block with children."""
+    return {
+        "object": "block",
+        "type": "toggle",
+        "toggle": {
+            "rich_text": [_make_rich_text(title, {}, None)],
+            "children": children,
+        },
+    }
+
+
 def markdown_to_blocks(markdown: str) -> list[dict]:
     """Convert Markdown text to a list of Notion block objects.
 
@@ -19,6 +50,16 @@ def markdown_to_blocks(markdown: str) -> list[dict]:
     Returns:
         List of Notion block dictionaries.
     """
+    blocks: list[dict] = []
+
+    # Extract front matter if present
+    front_matter, markdown = _extract_front_matter(markdown)
+    if front_matter:
+        # Create toggle block with code block inside
+        code_block = _make_code_block(front_matter, "yaml")
+        toggle_block = _make_toggle_block("📋 Front Matter", [code_block])
+        blocks.append(toggle_block)
+
     md = MarkdownIt("commonmark")
     md.enable("strikethrough")
     md.enable("table")
@@ -27,7 +68,9 @@ def markdown_to_blocks(markdown: str) -> list[dict]:
     md.use(admon_plugin)
     md.use(footnote_plugin)
     tokens = md.parse(markdown)
-    return _tokens_to_blocks(tokens)
+    blocks.extend(_tokens_to_blocks(tokens))
+
+    return blocks
 
 
 def _tokens_to_blocks(tokens: list[Token]) -> list[dict]:
