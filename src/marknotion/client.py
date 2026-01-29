@@ -245,3 +245,50 @@ class NotionClient:
             self.append_blocks_in_batches(page["id"], remaining)
 
         return page
+
+    # =========================================================================
+    # Database Operations
+    # =========================================================================
+
+    @retry_on_error(on_retry=_default_on_retry)
+    def create_database_entry(
+        self,
+        database_id: str,
+        properties: dict[str, Any],
+        children: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Create a new entry (page) in a database.
+
+        Args:
+            database_id: Database ID
+            properties: Property values for the entry
+            children: Optional content blocks (max 100)
+
+        Returns:
+            Created page object
+        """
+        params: dict[str, Any] = {
+            "parent": {"database_id": database_id},
+            "properties": properties,
+        }
+        if children:
+            params["children"] = children[:100]
+
+        return self.client.pages.create(**params)
+
+    @retry_on_error(on_retry=_default_on_retry)
+    def update_database_entry(
+        self,
+        page_id: str,
+        properties: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update an existing database entry (page).
+
+        Args:
+            page_id: Page ID of the entry to update
+            properties: Property values to update
+
+        Returns:
+            Updated page object
+        """
+        return self.client.pages.update(page_id=page_id, properties=properties)
