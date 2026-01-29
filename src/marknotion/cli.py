@@ -177,20 +177,46 @@ def _fetch_nested_children(client, blocks: list) -> list:
     return blocks
 
 
+def _extract_title(item: dict) -> str:
+    """Extract title from a Notion page or database object."""
+    obj_type = item.get("object")
+
+    # Database/data_source: title is in item["title"] array
+    if obj_type in ("database", "data_source"):
+        title_arr = item.get("title", [])
+        if title_arr:
+            return "".join(t.get("plain_text", "") for t in title_arr)
+        return "(untitled database)"
+
+    # Page: title is in properties.title.title array
+    title_prop = item.get("properties", {}).get("title", {})
+    title_arr = title_prop.get("title", [])
+    if title_arr:
+        return "".join(t.get("plain_text", "") for t in title_arr)
+    return "(untitled page)"
+
+
+
+
 @click.command()
 @click.argument("query", required=True)
+@click.option("--type", "-t", "obj_type", type=click.Choice(["page", "database", "all"]),
+              default="all", help="Filter by type (default: all)")
 @click.option("--limit", "-n", default=20, help="Max results to show (default: 20)")
 @click.version_option()
-def notion_search(query: str, limit: int):
-    """Search Notion pages by title.
+def notion_search(query: str, obj_type: str, limit: int):
+    """Search Notion pages and databases.
 
     \b
     Examples:
-        # Search for pages
-        notion-search "my notes"
+        # Search all (pages and databases)
+        notion-search "my project"
 
-        # Limit results
-        notion-search guide -n 5
+        # Search only databases
+        notion-search "tracker" --type database
+
+        # Search only pages
+        notion-search "notes" -t page
 
     \b
     Environment:
@@ -201,27 +227,32 @@ def notion_search(query: str, limit: int):
 
     client = NotionClient()
 
+    # Map "all" to None for the API
+    filter_type = None if obj_type == "all" else obj_type
+
     click.echo(f"Searching for: {query}...", err=True)
-    results = client.search_pages(query)
+    results = client.search(query, object_type=filter_type)
 
     if not results:
-        click.echo("No pages found.")
+        click.echo("No results found.")
         return
 
-    click.echo(f"\nFound {len(results)} pages:\n")
-    click.echo(f"{'ID':<36}  Title")
-    click.echo("-" * 70)
+    click.echo(f"\nFound {len(results)} result(s):\n")
 
-    for page in results[:limit]:
-        page_id = page.get("id", "")
-        title_prop = page.get("properties", {}).get("title", {})
-        title_arr = title_prop.get("title", [])
-        title = title_arr[0]["plain_text"] if title_arr else "(untitled)"
+    for item in results[:limit]:
+        item_type = item.get("object", "unknown")
+        item_id = item.get("id", "")
+        title = _extract_title(item)
+        url = item.get("url", "")
 
-        click.echo(f"{page_id}  {title}")
+        type_label = "[Database]" if item_type in ("database", "data_source") else "[Page]    "
+        click.echo(f"{type_label} {title}")
+        click.echo(f"           ID:  {item_id}")
+        click.echo(f"           URL: {url}")
+        click.echo()
 
     if len(results) > limit:
-        click.echo(f"\n... and {len(results) - limit} more (use -n to show more)")
+        click.echo(f"... and {len(results) - limit} more (use -n to show more)")
 
 
 if __name__ == "__main__":

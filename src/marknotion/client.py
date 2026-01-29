@@ -85,8 +85,32 @@ class NotionClient:
         self.client = Client(auth=self.token)
         self._on_retry = on_retry
 
+    def search(
+        self,
+        query: str,
+        object_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search for pages and/or databases.
+
+        Args:
+            query: Search query
+            object_type: Filter by type - "page", "database", or None for both
+
+        Returns:
+            List of page/database objects
+        """
+        params: dict[str, Any] = {"query": query}
+        if object_type == "page":
+            params["filter"] = {"property": "object", "value": "page"}
+        elif object_type == "database":
+            # Notion API uses "data_source" for databases
+            params["filter"] = {"property": "object", "value": "data_source"}
+
+        response = self.client.search(**params)
+        return response.get("results", [])
+
     def search_pages(self, query: str) -> list[dict[str, Any]]:
-        """Search for pages by title.
+        """Search for pages by title (legacy method).
 
         Args:
             query: Search query
@@ -94,8 +118,7 @@ class NotionClient:
         Returns:
             List of page objects
         """
-        response = self.client.search(query=query)
-        return response.get("results", [])
+        return self.search(query, object_type="page")
 
     def get_block_children(self, block_id: str) -> list[dict[str, Any]]:
         """Get all child blocks of a block/page with automatic pagination.

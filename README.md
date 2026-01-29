@@ -5,6 +5,10 @@ Bidirectional Markdown ↔ Notion converter with CLI tools.
 ## Installation
 
 ```bash
+# With uv (recommended for CLI tools)
+uv tool install marknotion
+
+# Or with pip
 pip install marknotion
 ```
 
@@ -56,14 +60,32 @@ notion2md "https://notion.so/My-Page-abc123..."
 notion2md abc123... -o exported.md
 ```
 
-### notion-search - Search Notion Pages
+### notion-search - Search Notion Pages and Databases
 
 ```bash
-# Search by keyword
-notion-search "meeting notes"
+# Search all (pages and databases)
+notion-search "project"
+
+# Search only databases (useful for finding database IDs)
+notion-search "tracker" --type database
+
+# Search only pages
+notion-search "notes" --type page
 
 # Limit results
 notion-search project -n 5
+```
+
+Output includes type, ID, and clickable URL:
+
+```
+[Database] Projects
+           ID:  1d73963f-ce05-8183-9af4-000b16a57189
+           URL: https://www.notion.so/1d73963fce05813bac29eba023f0dd25
+
+[Page]     Meeting Notes
+           ID:  abc123de-f456-7890-1234-56789012abcd
+           URL: https://www.notion.so/Meeting-Notes-abc123def4567890123456789012abcd
 ```
 
 ## Python API
