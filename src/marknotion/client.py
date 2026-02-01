@@ -120,6 +120,38 @@ class NotionClient:
         """
         return self.search(query, object_type="page")
 
+    @retry_on_error(on_retry=_default_on_retry)
+    def get_page(self, page_id: str) -> dict[str, Any]:
+        """Get a page by ID.
+
+        Args:
+            page_id: Page ID
+
+        Returns:
+            Page object with properties
+        """
+        return self.client.pages.retrieve(page_id=page_id)
+
+    def get_page_title(self, page_id: str) -> str:
+        """Get the title of a page.
+
+        Args:
+            page_id: Page ID
+
+        Returns:
+            Page title string, or empty string if not found
+        """
+        page = self.get_page(page_id)
+        properties = page.get("properties", {})
+
+        # Find the title property (type == "title")
+        for prop in properties.values():
+            if prop.get("type") == "title":
+                title_parts = prop.get("title", [])
+                return "".join(t.get("plain_text", "") for t in title_parts)
+
+        return ""
+
     def get_block_children(self, block_id: str) -> list[dict[str, Any]]:
         """Get all child blocks of a block/page with automatic pagination.
 

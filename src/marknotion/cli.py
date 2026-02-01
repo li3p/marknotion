@@ -149,10 +149,19 @@ def notion2md(page: str, output: str | None):
     client = NotionClient()
 
     click.echo(f"Fetching page: {page_id[:8]}...", err=True)
+
+    # Get page title
+    title = client.get_page_title(page_id)
+
+    # Get page content
     blocks = client.get_block_children(page_id)
     blocks = _fetch_nested_children(client, blocks)
 
     markdown = blocks_to_markdown(blocks)
+
+    # Prepend title as H1
+    if title:
+        markdown = f"# {title}\n\n{markdown}"
 
     if output:
         Path(output).write_text(markdown, encoding="utf-8")
