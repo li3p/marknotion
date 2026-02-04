@@ -409,18 +409,48 @@ def _normalize_language(language: str) -> str:
     return "plain text"
 
 
+def _utf16_len(s: str) -> int:
+    """Return the length of a string in UTF-16 code units.
+
+    Notion API counts string length in UTF-16 code units (like JavaScript),
+    not Unicode codepoints (like Python). Characters outside the BMP
+    (e.g. emoji like 📋) count as 2 in UTF-16 but 1 in Python's len().
+    """
+    return len(s.encode("utf-16-le")) // 2
+
+
+def _split_by_utf16_len(content: str, max_len: int) -> list[str]:
+    """Split content into chunks where each chunk's UTF-16 length <= max_len."""
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+
+    for char in content:
+        char_len = _utf16_len(char)
+        if current_len + char_len > max_len and current:
+            chunks.append("".join(current))
+            current = [char]
+            current_len = char_len
+        else:
+            current.append(char)
+            current_len += char_len
+
+    if current:
+        chunks.append("".join(current))
+
+    return chunks
+
+
 def _make_code_block(content: str, language: str) -> dict:
     """Create a Notion code block.
 
-    Notion has a 2000 character limit per rich_text item, so long content
-    is split into multiple rich_text items.
+    Notion has a 2000 character limit per rich_text item (counted in UTF-16
+    code units), so long content is split into multiple rich_text items.
     """
-    # Split content into chunks of max 2000 characters
     max_len = 2000
     rich_text_items = []
 
-    for i in range(0, len(content), max_len):
-        chunk = content[i:i + max_len]
+    for chunk in _split_by_utf16_len(content, max_len):
         rich_text_items.append(_make_rich_text(chunk, {}, None))
 
     # Ensure at least one item (even if empty)

@@ -91,6 +91,57 @@ class TestCodeBlock:
         blocks = markdown_to_blocks(md)
         assert blocks[0]["code"]["language"] == "plain text"
 
+    def test_code_block_long_content_split(self):
+        """Code blocks >2000 chars should be split into multiple rich_text items."""
+        content = "x" * 2500
+        md = f"```\n{content}\n```"
+        blocks = markdown_to_blocks(md)
+        rich_text = blocks[0]["code"]["rich_text"]
+        assert len(rich_text) == 2
+        assert len(rich_text[0]["plain_text"]) == 2000
+        assert len(rich_text[1]["plain_text"]) == 500
+
+    def test_code_block_split_respects_utf16_length(self):
+        """Splitting must count UTF-16 code units, not Python codepoints.
+
+        Emoji like 📋 (U+1F4CB) are 1 Python char but 2 UTF-16 code units.
+        A string of 1000 such emoji is 1000 Python chars but 2000 UTF-16 units,
+        so it should fit in one rich_text item.  1001 emoji = 2002 UTF-16 units
+        and must be split.
+        """
+        # 1000 emoji = 2000 UTF-16 units → fits in one chunk
+        content = "📋" * 1000
+        md = f"```\n{content}\n```"
+        blocks = markdown_to_blocks(md)
+        rich_text = blocks[0]["code"]["rich_text"]
+        assert len(rich_text) == 1
+
+        # 1001 emoji = 2002 UTF-16 units → must split
+        content = "📋" * 1001
+        md = f"```\n{content}\n```"
+        blocks = markdown_to_blocks(md)
+        rich_text = blocks[0]["code"]["rich_text"]
+        assert len(rich_text) == 2
+        assert rich_text[0]["plain_text"] == "📋" * 1000
+        assert rich_text[1]["plain_text"] == "📋"
+
+    def test_code_block_split_mixed_ascii_and_emoji(self):
+        """Mix of ASCII (1 UTF-16 unit) and emoji (2 UTF-16 units)."""
+        # 1997 ASCII chars + 1 emoji = 1997 + 2 = 1999 UTF-16 units → one chunk
+        content = "a" * 1997 + "📋"
+        md = f"```\n{content}\n```"
+        blocks = markdown_to_blocks(md)
+        assert len(blocks[0]["code"]["rich_text"]) == 1
+
+        # 1999 ASCII chars + 1 emoji = 1999 + 2 = 2001 UTF-16 units → two chunks
+        content = "a" * 1999 + "📋"
+        md = f"```\n{content}\n```"
+        blocks = markdown_to_blocks(md)
+        rich_text = blocks[0]["code"]["rich_text"]
+        assert len(rich_text) == 2
+        assert rich_text[0]["plain_text"] == "a" * 1999
+        assert rich_text[1]["plain_text"] == "📋"
+
 
 class TestQuote:
     def test_blockquote(self):
