@@ -18,6 +18,25 @@ from marknotion.md2notion import markdown_to_blocks
 from marknotion.notion2md import blocks_to_markdown
 
 
+class CloudflareWAFError(Exception):
+    """Raised when Cloudflare WAF blocks a request to Notion API.
+
+    This typically happens when code block content contains patterns that
+    Cloudflare interprets as an attack (e.g., shell commands with IP addresses
+    and curl in the same block).
+    """
+
+    def __init__(self, body: str = ""):
+        self.body = body
+        super().__init__(
+            "Cloudflare WAF blocked the request to Notion API.\n"
+            "This usually means the content contains patterns that trigger "
+            "Cloudflare's security rules (e.g., shell commands with IP addresses "
+            "combined with curl/wget in the same code block).\n"
+            "Try splitting the offending code block into separate blocks."
+        )
+
+
 def retry_on_error(
     max_retries: int = 5,
     initial_delay: float = 1.0,
@@ -34,6 +53,8 @@ def retry_on_error(
                 try:
                     return func(*args, **kwargs)
                 except HTTPResponseError as e:
+                    if e.status == 403 and "Cloudflare" in str(e.body):
+                        raise CloudflareWAFError(e.body) from e
                     if e.status not in (429, 500, 502, 503, 504) or attempt == max_retries:
                         raise
                     if on_retry:
@@ -188,7 +209,12 @@ class NotionClient:
         Returns:
             Response object
         """
-        return self.client.blocks.children.append(block_id=page_id, children=children[:100])
+        try:
+            return self.client.blocks.children.append(block_id=page_id, children=children[:100])
+        except HTTPResponseError as e:
+            if e.status == 403 and "Cloudflare" in str(e.body):
+                raise CloudflareWAFError(e.body) from e
+            raise
 
     def append_blocks_in_batches(self, page_id: str, blocks: list[dict[str, Any]]) -> None:
         """Append blocks to a page in batches of 100 (Notion API limit).
@@ -235,7 +261,12 @@ class NotionClient:
         if children:
             params["children"] = children[:100]
 
-        return self.client.pages.create(**params)
+        try:
+            return self.client.pages.create(**params)
+        except HTTPResponseError as e:
+            if e.status == 403 and "Cloudflare" in str(e.body):
+                raise CloudflareWAFError(e.body) from e
+            raise
 
     def update_page_content_from_markdown(self, page_id: str, markdown: str) -> None:
         """Update page content from markdown.

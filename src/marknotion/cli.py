@@ -68,7 +68,7 @@ def md2notion(file: str, page: str | None, parent: str | None, title: str | None
         NOTION_TOKEN: Your Notion integration token
                       Create at: https://www.notion.so/my-integrations
     """
-    from marknotion.client import NotionClient
+    from marknotion.client import CloudflareWAFError, NotionClient
 
     page_id = None
     parent_id = None
@@ -105,15 +105,26 @@ def md2notion(file: str, page: str | None, parent: str | None, title: str | None
 
     client = NotionClient()
 
-    if page_id:
-        click.echo(f"Updating page: {page_id[:8]}...")
-        client.update_page_content_from_markdown(page_id, content)
-        click.echo(f"Done! Updated page with content from {file_path.name}")
-    else:
-        click.echo(f"Creating page '{title}' under {parent_id[:8]}...")
-        result = client.create_child_page_from_markdown(parent_id, title, content)
-        new_id = result["id"].replace("-", "")
-        click.echo(f"Done! Created page: https://notion.so/{new_id}")
+    try:
+        if page_id:
+            click.echo(f"Updating page: {page_id[:8]}...")
+            client.update_page_content_from_markdown(page_id, content)
+            click.echo(f"Done! Updated page with content from {file_path.name}")
+        else:
+            click.echo(f"Creating page '{title}' under {parent_id[:8]}...")
+            result = client.create_child_page_from_markdown(parent_id, title, content)
+            new_id = result["id"].replace("-", "")
+            click.echo(f"Done! Created page: https://notion.so/{new_id}")
+    except CloudflareWAFError:
+        click.echo(
+            "\nError: Cloudflare WAF blocked the request.\n"
+            "The markdown content contains patterns that trigger Cloudflare's\n"
+            "security rules (e.g., shell commands with IP addresses combined\n"
+            "with curl/wget in the same code block).\n\n"
+            "Fix: Split the offending code block into separate blocks.",
+            err=True,
+        )
+        raise SystemExit(1)
 
 
 @click.command()
